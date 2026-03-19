@@ -16,7 +16,7 @@ load_dotenv()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
-    
+    app.state.logger = setup_logger()
     app.state.llm = ChatOpenAI(
         model=os.getenv("OPENAI_API_MODEL", "gpt-4o-mini"),
         api_key=os.getenv("OPENAI_API_KEY")
@@ -36,7 +36,7 @@ app = FastAPI(
     description="A simple FastAPI webapp",
     lifespan=lifespan
 )
-app.state.logger = setup_logger()
+
 app.add_middleware(RequestLogMiddleware)
 
 # CORS 설정
