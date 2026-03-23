@@ -8,7 +8,7 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         elapsed = time.perf_counter() - start
 
-        request.app.logger.info(
+        request.app.state.logger.info(
             f"{request.method} {request.url.path} -> {response.status_code} ({elapsed:.3f}s)"
         )
         return response
