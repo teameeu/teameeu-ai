@@ -267,17 +267,9 @@ class HybridRAG:
             }
             for doc in results
         ]
+        
         final_results = []
         for result in results_dict[:top_k]:
-            summary = result.get("metadata", {}).get("page_content")
-            if summary == None:
-                summary = result.get("page_content")
+            final_results.append(result.get("page_content"))
 
-            final_results.append({
-                "url": result.get("metadata", {}).get("url"),
-                "category": result.get("metadata", {}).get("category"),
-                "title": result.get("metadata", {}).get("title"),
-                "authors": result.get("metadata", {}).get("authors"),
-                "summary": summary
-            })
         return final_results

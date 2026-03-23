@@ -15,6 +15,7 @@ from app.core.logger import setup_logger
 from app.core.middleware import RequestLogMiddleware
 from app.rag.retriever import HybridRAG
 from app.api.health import router as health_router
+from app.api.test import router as test_router
 
 load_dotenv()
 config = load_config()
@@ -28,7 +29,7 @@ async def lifespan(app: FastAPI):
     app.state.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     app.state.HF_TOKEN = os.getenv("HF_TOKEN")
     app.state.kiwi = KiwiTokenizer()
-    app.state.research_rag = HybridRAG(app)
+    app.state.job_rag = HybridRAG(app)
 
     app.state.model = {
         "gpt-5-mini-minimal": ChatOpenAI(
@@ -83,6 +84,7 @@ app.add_middleware(
 
 # Router 등록
 app.include_router(health_router)
+app.include_router(test_router)
 
 if __name__ == "__main__":
     import uvicorn
