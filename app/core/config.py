@@ -26,8 +26,8 @@ def define_argparser():
                     help='가져올 컨텍스트의 최대 개수')
     p.add_argument('--rag_data_path', type=str, default="./data/json",
                     help='RAG 구성용 데이터 경로')
-    p.add_argument('--research_storage_path', type=str, default='app/faiss_db/research', 
-                   help='논문 데이터 경로')
+    p.add_argument('--job_storage_path', type=str, default='app/faiss_db/job', 
+                   help='RAG 인덱스 경로')
     p.add_argument('--department_competency_storage_path', type=str, default='app/faiss_db/department', 
                    help='학과별 인재상 매칭 데이터 경로')
     return p

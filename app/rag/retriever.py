@@ -1,7 +1,7 @@
 import glob
 import time
 import json
-import fcntl
+import winfcntl
 import pickle
 from pathlib import Path
 from typing import List
@@ -18,7 +18,7 @@ class HybridRAG:
     def __init__(self, app):
         self.logger = app.state.logger
         self.rag_data_path = Path(app.state.config.rag_data_path)
-        self.research_storage_path = Path(app.state.config.research_storage_path)
+        self.job_storage_path = Path(app.state.config.job_storage_path)
         self.retriever: ContextualCompressionRetriever | None = None
         self.kiwi = app.state.kiwi
         self.thresholds = 0.4
@@ -48,33 +48,23 @@ class HybridRAG:
         return bm25_index
 
     def _init_retriever(self):
-        """
-        하이브리드 retriever 초기화
-        FAISS + BM25 ensemble → Contextual Compression
-        """
-        faiss_dir = self.research_storage_path / "faiss"
-        bm25_path = self.research_storage_path / "bm25_index.pkl"
-        lock_path = self.research_storage_path / ".init.lock"
+        faiss_dir = self.job_storage_path / "faiss"
+        bm25_path = self.job_storage_path / "bm25_index.pkl"
 
-        self.research_storage_path.mkdir(exist_ok=True)
+        self.job_storage_path.mkdir(exist_ok=True)
 
         start = time.time()
-        with open(lock_path, 'w') as lock_file:
-            try:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                
-                if faiss_dir.exists() and bm25_path.exists():
-                    self._load(faiss_dir, bm25_path)
-                else:
-                    self._build_and_save(faiss_dir, bm25_path)
-            finally:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-                self.logger.info(f"ResearchRAG 하이브리드 검색 초기화 소요 시간: {time.time() - start:.2f}초")
-        self.logger.info("ResearchRAG 하이브리드 검색 로드 완료")
+
+        if faiss_dir.exists() and bm25_path.exists():
+            self._load(faiss_dir, bm25_path)
+        else:
+            self._build_and_save(faiss_dir, bm25_path)
+
+        self.logger.info(f"초기화 소요 시간: {time.time() - start:.2f}초")
 
     def _load_research_data(self):
         """research_data 파일 로드"""
-        pattern = str(self.rag_data_path / "research_data_*.jsonl")
+        pattern = str(self.rag_data_path / "careernet_jobs.jsonl")
         json_files = glob.glob(pattern)
         
         if not json_files:
@@ -101,11 +91,10 @@ class HybridRAG:
 
         bm25_docs = []
         for record in data:
-            search_text = f"{record['metadata']['title']} {' '.join(record['metadata']['keywords'])}".strip()
             bm25_metadata = record["metadata"]
             bm25_metadata["page_content"] = record["page_content"]
             bm25_docs.append(Document(
-                page_content=search_text,
+                page_content=bm25_metadata["page_content"],
                 metadata=bm25_metadata
             ))
 
