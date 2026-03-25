@@ -8,12 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from langchain_openai import ChatOpenAI
 
+from FlagEmbedding import FlagReranker
+
+from app.rag.embedding import Qwen3Embeddings
 from app.tokenizer.kiwi import KiwiTokenizer
 
 from app.core.config import load_config
 from app.core.logger import setup_logger
 from app.core.middleware import RequestLogMiddleware
-from app.rag.retriever import HybridRAG
+from app.rag.careernet_rag import CareernetJobHybridRAG, CareernetDeptHybridRAG
 from app.api.health import router as health_router
 from app.api.test import router as test_router
 
@@ -29,7 +32,14 @@ async def lifespan(app: FastAPI):
     app.state.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     app.state.HF_TOKEN = os.getenv("HF_TOKEN")
     app.state.kiwi = KiwiTokenizer()
-    app.state.job_rag = HybridRAG(app)
+    app.state.embeddings = Qwen3Embeddings()
+    app.state.reranker = FlagReranker(
+        "BAAI/bge-reranker-v2-m3",
+        use_fp16=False,   # GPU 있으면 True, 없으면 False로
+    )
+    app.state.job_rag = CareernetJobHybridRAG(app)
+    app.state.dept_rag = CareernetDeptHybridRAG(app)
+    
 
     app.state.model = {
         "gpt-5-mini-minimal": ChatOpenAI(
