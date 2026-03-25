@@ -8,7 +8,6 @@ from typing import List
 
 from langchain.schema import Document
 from langchain_community.vectorstores import FAISS
-from app.rag.embedding import Qwen3Embeddings
 from langchain.retrievers import EnsembleRetriever, ContextualCompressionRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers.document_compressors import EmbeddingsFilter
@@ -27,8 +26,10 @@ class BaseHybridRAG(ABC):
         self.kiwi = app.state.kiwi
         self.thresholds = 0.4
         self.k = 10
-        self.embeddings = Qwen3Embeddings()
+        self.embeddings = app.state.embeddings
         self.retriever: ContextualCompressionRetriever | None = None
+        self.rerank_candidates = self.k * 2
+        self.reranker = app.state.reranker
 
         # 인덱스 저장 경로: job_storage_path / index_subdir
         base = Path(app.state.config.storage_path)
@@ -241,4 +242,16 @@ class BaseHybridRAG(ABC):
             raise ValueError("Retriever가 초기화되지 않음")
 
         results = await self.retriever.ainvoke(query)
-        return [doc.page_content for doc in results[:top_k]]
+        candidates = results[: self.rerank_candidates]
+
+        if not candidates:
+            return []
+        # reranking
+        pairs = [[query, doc.page_content] for doc in candidates]
+        scores = self.reranker.compute_score(pairs, normalize=True)
+
+        if isinstance(scores, float):
+            scores = [scores]
+        
+        reranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
+        return [doc.page_content for doc in reranked[:top_k]]
