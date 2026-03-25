@@ -254,4 +254,4 @@ class BaseHybridRAG(ABC):
             scores = [scores]
         
         reranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
-        return [doc.page_content for doc in reranked[:top_k]]
+        return [doc.page_content for _, doc in reranked[:top_k]]
