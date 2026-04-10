@@ -1,5 +1,6 @@
 import asyncio
 
+from app.infra.invoke_with_retry import invoke_with_retry
 from app.models.chat import RequestChat, ResponseChat
 
 
@@ -8,7 +9,8 @@ class ChatService:
         self.job_rag = app_state.job_rag
         self.dept_rag = app_state.dept_rag
         self.query_decomposer = app_state.query_decomposer
-        self.model = app_state.model
+        self.prompt_generator = app_state.prompt_generator
+        self.model = app_state.model["gpt-5-mini-chat"]
         self.logger = app_state.logger
 
     async def _process_subquery_retrieve(self, sub_query):
@@ -17,11 +19,11 @@ class ChatService:
 
         if q_type == "job":
             results = await self.job_rag.asearch(query)
-            return ("job", {"sub_query": query, "results": results})
+            return ("job", {"sub_query": query, "results": results[:3]})
 
         elif q_type == "dept":
             results = await self.dept_rag.asearch(query)
-            return ("dept", {"sub_query": query, "results": results})
+            return ("dept", {"sub_query": query, "results": results[:3]})
 
         else:
             return ("general", query)
@@ -55,10 +57,38 @@ class ChatService:
         sub_queries = self.query_decomposer.decompose_query(conversation_history, current_message)
         
         job_queries, dept_queries, general_queries =  await self._run_parallel_retrieve(sub_queries)
-        print("job_queries:", job_queries)
-        print("dept_queries:", dept_queries)
-        print("general_queries:", general_queries)
 
+        # convert to langchain messages
+        input = {
+            "job_queries": job_queries,
+            "dept_queries": dept_queries,
+            "general_queries": general_queries,
+            "conversation_history": conversation_history,
+            "current_message": current_message
+        }
+        messages = self.prompt_generator.generate_prompt("chat", **input)
 
-        response = ResponseChat(message="This is a response to the chat request.")
+        # res validation func
+        def check_output_format(response):
+            try:
+                if len(response.content) > 0:
+                    return True
+                else:
+                    return False
+            except Exception as e:
+                print(f"Error parsing response: {e}")
+                
+                return False
+        
+        # invoke with retry
+        def return_response(response):
+            return response.content
+        
+        response = invoke_with_retry(
+            model = self.model, 
+            messages=messages, 
+            check_fn=check_output_format, 
+            parse_fn=return_response
+        )
+
         return response
