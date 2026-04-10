@@ -54,8 +54,10 @@ class ChatService:
         conversation_history = request.conversation_history
 
         # decompose_query
+        yield "__STATUS__질문을 분석하고 있습니다..."
         sub_queries = self.query_decomposer.decompose_query(conversation_history, current_message)
         
+        yield "__STATUS__관련 정보를 검색하고 있습니다..."
         job_queries, dept_queries, general_queries =  await self._run_parallel_retrieve(sub_queries)
 
         # convert to langchain messages
@@ -66,29 +68,8 @@ class ChatService:
             "conversation_history": conversation_history,
             "current_message": current_message
         }
+        yield "__STATUS__답변을 생성하고 있습니다..."
         messages = self.prompt_generator.generate_prompt("chat", **input)
-
-        # res validation func
-        def check_output_format(response):
-            try:
-                if len(response.content) > 0:
-                    return True
-                else:
-                    return False
-            except Exception as e:
-                print(f"Error parsing response: {e}")
-                
-                return False
         
-        # invoke with retry
-        def return_response(response):
-            return response.content
-        
-        response = invoke_with_retry(
-            model = self.model, 
-            messages=messages, 
-            check_fn=check_output_format, 
-            parse_fn=return_response
-        )
-
-        return response
+        async for chunk in self.model.astream(messages):
+            yield chunk.content
