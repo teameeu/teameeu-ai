@@ -1,7 +1,6 @@
 import asyncio
 
 from app.models.chat import RequestChat, ResponseChat
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 class ChatService:
