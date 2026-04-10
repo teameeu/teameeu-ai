@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  teameeu-ai-agent-worker:
+    image: ${DOCKER_REGISTRY_ADDRESS}/teameeu-ai-agent-worker:latest
+    shm_size: 2G
+    env_file:
+      - .env
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "0"
+      PYTHONPATH: /workspace
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    ports:
+      - "8000:80"
+    working_dir: /workspace
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
