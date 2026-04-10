@@ -1,21 +1,33 @@
 import torch
 from sentence_transformers import SentenceTransformer
+from transformers import BitsAndBytesConfig
 from langchain.embeddings.base import Embeddings
 from typing import List
 
 class Qwen3Embeddings(Embeddings):
-    def __init__(self):
+    def __init__(self, CUDA_VISIBLE_DEVICES: bool):
         model_name: str = "Qwen/Qwen3-Embedding-0.6B"
-        self.model = SentenceTransformer(
-            model_name,
-            model_kwargs={
-                # "attn_implementation": "flash_attention_2", 
-                "device_map": "cpu", 
-                "dtype": torch.float32, 
-                # "max_memory": {0: "5GiB", "cpu": "16GiB"}
-                },
-            tokenizer_kwargs={"padding_side": "left"},
-        )
+
+        if CUDA_VISIBLE_DEVICES:
+            quant_config = BitsAndBytesConfig(load_in_8bit=True)
+            self.model = SentenceTransformer(
+                model_name,
+                model_kwargs={
+                    # "attn_implementation": "flash_attention_2", 
+                    "device_map": "auto", 
+                    "quantization_config": quant_config, 
+                    },
+                processor_kwargs={"padding_side": "left"},
+            )
+        else:
+            self.model = SentenceTransformer(
+                model_name,
+                model_kwargs={
+                    "device_map": "cpu", 
+                    "dtype": torch.float32, 
+                    },
+                processor_kwargs={"padding_side": "left"},
+            )
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """

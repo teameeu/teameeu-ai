@@ -1,6 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+import torch
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -10,15 +11,21 @@ from langchain_openai import ChatOpenAI
 
 from FlagEmbedding import FlagReranker
 
+from app.prompt.prompt_generator import PromptGenerator
 from app.rag.embedding import Qwen3Embeddings
+from app.rag.query_decomposer import QueryDecomposer
 from app.tokenizer.kiwi import KiwiTokenizer
+
+from app.service.chat_service import ChatService
 
 from app.core.config import load_config
 from app.core.logger import setup_logger
 from app.core.middleware import RequestLogMiddleware
 from app.rag.careernet_rag import CareernetJobHybridRAG, CareernetDeptHybridRAG
+
 from app.api.health import router as health_router
 from app.api.test import router as test_router
+from app.api.chat import router as chat_router
 
 load_dotenv()
 config = load_config()
@@ -27,15 +34,20 @@ config = load_config()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
+    if torch.cuda.is_available():
+        CUDA_VISIBLE_DEVICES = True
+    else:
+        CUDA_VISIBLE_DEVICES = False
+
     app.state.config = config
     app.state.logger = setup_logger()
     app.state.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     app.state.HF_TOKEN = os.getenv("HF_TOKEN")
     app.state.kiwi = KiwiTokenizer()
-    app.state.embeddings = Qwen3Embeddings()
+    app.state.embeddings = Qwen3Embeddings(CUDA_VISIBLE_DEVICES)
     app.state.reranker = FlagReranker(
         "BAAI/bge-reranker-v2-m3",
-        use_fp16=False,   # GPU 있으면 True, 없으면 False로
+        use_fp16=CUDA_VISIBLE_DEVICES,   # GPU 있으면 True, 없으면 False로
     )
     app.state.job_rag = CareernetJobHybridRAG(app)
     app.state.dept_rag = CareernetDeptHybridRAG(app)
@@ -64,6 +76,10 @@ async def lifespan(app: FastAPI):
             seed = 10
         )
     }
+
+    app.state.prompt_generator = PromptGenerator()
+    app.state.query_decomposer = QueryDecomposer(app)
+    app.state.chat_service = ChatService(app.state)
 
     app.state.logger.info("Application startup")
 
@@ -94,8 +110,9 @@ app.add_middleware(
 
 # Router 등록
 app.include_router(health_router)
-app.include_router(test_router)
+app.include_router(test_router, prefix="/test")
+app.include_router(chat_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True) 
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8003, reload=True) 
