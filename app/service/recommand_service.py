@@ -1,3 +1,5 @@
+from numpy import rec
+
 from app.infra.invoke_with_retry import invoke_with_retry
 from app.utils.clean_str import parse_str_to_json
 
@@ -28,12 +30,19 @@ class RecommandService:
 
         def check_response_format(response):
             parsed = parse_str_to_json(response.content)
-            if not isinstance(parsed, dict) or "recommendations" not in parsed:
-                raise ValueError("Response must be a JSON object with a 'recommendations' key")
-            
-            for rec in parsed["recommendations"]:
-                if not isinstance(rec.get("id"), int) or not isinstance(rec.get("activity_type"), str) or not isinstance(rec.get("activity_title"), str) or not isinstance(rec.get("estimated_time"), str) or not isinstance(rec.get("detailed_todo"), list):
-                    raise ValueError("Invalid recommendation format")
+
+            for rec in parsed.get("recommendations", []):
+                if not isinstance(rec, dict):
+                    raise ValueError("rec is not dict")
+
+                if not isinstance(rec.get("id"), int) \
+                    or not isinstance(rec.get("activity_type"), str) \
+                    or not isinstance(rec.get("activity_title"), str) \
+                    or not isinstance(rec.get("estimated_time"), str) \
+                    or not isinstance(rec.get("detailed_todo"), list):
+                    raise ValueError("Invalid recommendation format")   
+                
+                return True
         
         def parse_response(response):
             return parse_str_to_json(response.content)
