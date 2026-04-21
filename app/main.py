@@ -14,6 +14,7 @@ from FlagEmbedding import FlagReranker
 from app.prompt.prompt_generator import PromptGenerator
 from app.rag.embedding import Qwen3Embeddings
 from app.rag.query_decomposer import QueryDecomposer
+from app.service.recommand_service import RecommandService
 from app.tokenizer.kiwi import KiwiTokenizer
 
 from app.service.chat_service import ChatService
@@ -26,6 +27,7 @@ from app.rag.careernet_rag import CareernetJobHybridRAG, CareernetDeptHybridRAG
 from app.api.health import router as health_router
 from app.api.test import router as test_router
 from app.api.chat import router as chat_router
+from app.api.roadmap import router as roadmap_router
 
 load_dotenv()
 config = load_config()
@@ -80,6 +82,7 @@ async def lifespan(app: FastAPI):
     app.state.prompt_generator = PromptGenerator()
     app.state.query_decomposer = QueryDecomposer(app)
     app.state.chat_service = ChatService(app.state)
+    app.state.recommand_service = RecommandService(app.state)
 
     app.state.logger.info("Application startup")
 
@@ -112,6 +115,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(test_router, prefix="/test")
 app.include_router(chat_router, prefix="/api")
+app.include_router(roadmap_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
